@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/devcontainers/universal:5-noble
+FROM --platform=linux/amd64 mcr.microsoft.com/devcontainers/universal:5-noble
 
 RUN sudo apt update ; \
   sudo apt install --yes shellcheck
