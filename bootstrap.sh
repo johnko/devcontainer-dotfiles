@@ -13,5 +13,10 @@ for i in $(find "$HOME/dotfiles" -type f -not -path "*/.git/*" -not -path "*/.de
 done
 
 set -x
+set +e
 
-go install github.com/mikefarah/yq/v4@v4.50.1 || true
+sudo apt update
+sudo apt install --yes shellcheck
+
+go install github.com/mikefarah/yq/v4@v4.50.1
+go install mvdan.cc/sh/v3/cmd/shfmt@v3.12.0
