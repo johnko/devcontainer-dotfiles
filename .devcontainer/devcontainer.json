@@ -1,3 +1,9 @@
 {
-  "image": "mcr.microsoft.com/devcontainers/typescript-node:24-trixie"
+  "initializeCommand": "docker pull --platform=linux/amd64 mcr.microsoft.com/devcontainers/universal:5-noble",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "options": [
+      "--platform=linux/amd64"
+    ]
+  }
 }
