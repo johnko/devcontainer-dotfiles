@@ -14,4 +14,4 @@ done
 
 set -x
 
-go install github.com/mikefarah/yq/v4@latest
+go install github.com/mikefarah/yq/v4@4.50.1 || true
