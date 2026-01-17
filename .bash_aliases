@@ -110,6 +110,26 @@ if type git &>/dev/null; then
     fi
   }
 fi
+allow-git-remote() {
+  if [[ ! -e "$HOME/.allowed_git_remote" ]]; then
+    touch "$HOME/.allowed_git_remote"
+  fi
+}
+deny-git-remote() {
+  if [[ -e "$HOME/.allowed_git_remote" ]]; then
+    rm "$HOME/.allowed_git_remote"
+  fi
+}
+allow-git-sign() {
+  if [[ ! -e "$HOME/.allowed_git_sign" ]]; then
+    touch "$HOME/.allowed_git_sign"
+  fi
+}
+deny-git-sign() {
+  if [[ ! -e "$HOME/.allowed_git_sign" ]]; then
+    rm "$HOME/.allowed_git_sign"
+  fi
+}
 
 ########################################
 
@@ -518,3 +538,13 @@ v-psa() {
 v-ssh() {
   vagrant ssh "${@}"
 }
+
+########################################
+
+if [[ ! -e "$HOME/.allowed_git_remote" ]]; then
+  export SSH_AUTH_SOCK=""
+fi
+# add $HOME/bin for custom scripts early in PATH
+if [[ -e "$HOME/bin" ]]; then
+  export PATH="$HOME/bin:$PATH"
+fi
