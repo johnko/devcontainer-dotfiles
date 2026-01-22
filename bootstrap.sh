@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
-
-set -x
-set +e
+set -uxo pipefail
 
 for i in $(find "$HOME/dotfiles" -type f -not -path "*/.git/*" -not -path "*/.devcontainer/*" -not -path "*/bootstrap.sh" | sed "s,$HOME/dotfiles/,,g"); do
   if [[ "$(dirname "$i")" != "." && "$(dirname "$i")" != "/" && "$(dirname "$i")" != "" ]]; then
