@@ -296,71 +296,91 @@ gg() {
         gh workflow list >/dev/null 2>&1 || echo "ERROR: Cannot list workflows. Try:    gh auth refresh --scopes workflow"
       fi
       ;;
-    clone)
-      pushd "$GG_WORKDIR" >/dev/null || return
+    worktree)
+      pushd "$GG_WORKDIR"
       LOCAL_REPO="$2"
       if [[ ! -e $LOCAL_REPO && ! -e "$LOCAL_REPO/.git" ]]; then
         git clone "git@github.com:$GG_GITHUB_ORG/$LOCAL_REPO.git" "$LOCAL_REPO"
       fi
       if [[ -e $LOCAL_REPO && -e "$LOCAL_REPO/.git" ]]; then
-        SAFE_FOLDER=$(echo "$3" | tr -d -C '0-9a-zA-Z_-')
-        SAFE_BRANCH=$(echo "$3" | tr -d -C '0-9a-zA-Z_/-')
-        pushd "$LOCAL_REPO" >/dev/null || return
-        ORIGINAL_REMOTE=$(git remote get-url origin)
+        SAFE_BRANCH=$(echo "$3" | sed 's/[^a-zA-Z0-9-]/-/g' | cut -c1-50)
+
+        pushd "$LOCAL_REPO"
         DEFAULT_BRANCH=master
         if git branch -a | grep -q 'remotes/origin/main'; then
           DEFAULT_BRANCH=main
         fi
-        git fetch origin $DEFAULT_BRANCH &>/dev/null
-        popd &>/dev/null || return
-        if [[ ! -e "$LOCAL_REPO.$SAFE_FOLDER" ]]; then
-          git clone "$LOCAL_REPO" "$LOCAL_REPO.$SAFE_FOLDER"
+        git fetch origin "$DEFAULT_BRANCH"
+        git worktree add -b "$SAFE_BRANCH" ../"$LOCAL_REPO.worktrees/$SAFE_BRANCH" "origin/$DEFAULT_BRANCH"
+
+        pushd ../"$LOCAL_REPO.worktrees/$SAFE_BRANCH"
+        echo "Opening code and cursor (if possible)"
+        if type code &>/dev/null; then
+          code .
         fi
-        pushd "$LOCAL_REPO.$SAFE_FOLDER" >/dev/null || return
-        git remote set-url origin "$ORIGINAL_REMOTE"
-        git remote get-url origin
-        git fetch origin $DEFAULT_BRANCH &>/dev/null
-        git checkout "$SAFE_BRANCH" &>/dev/null || git checkout -b "$SAFE_BRANCH" origin/$DEFAULT_BRANCH || git checkout -b "$SAFE_FOLDER" origin/$DEFAULT_BRANCH
-        git branch -D $DEFAULT_BRANCH &>/dev/null
-        if [[ -e ~/.aws/config ]]; then
-          if ! grep -q cursor ~/.aws/config; then
-            echo "ERROR: AWS Profile 'cursor' was not found in ~/.aws/config"
-          else
-            AWS_VAULT_PROMPT=ykman aws-vault export cursor | awk '{print "export "$0}' >~/.aws_temp_credentials_secret
-          fi
-          if [[ -e ~/.aws_temp_credentials_secret ]]; then
-            set +x
-            source ~/.aws_temp_credentials_secret
-          fi
-          if [[ ! -e ~/kubeconfig/cursor.config ]]; then
-            echo "ERROR: kube config was not found at ~/kubeconfig/cursor.config"
-          else
-            mkdir -p ~/.kube
-            cp ~/kubeconfig/cursor.config ~/.kube/config
-          fi
+        if type cursor &>/dev/null; then
+          cursor .
         fi
-        if [[ -z $CODE_EDITOR ]]; then
-          OPEN_EDITOR=code
-        else
-          OPEN_EDITOR=$CODE_EDITOR
-        fi
-        echo "Opening $OPEN_EDITOR"
-        $OPEN_EDITOR .
       fi
+      ;;
+    vsk8s)
+      if [[ -e ~/.aws/config ]]; then
+        if ! grep -q cursor ~/.aws/config; then
+          echo "ERROR: AWS Profile 'cursor' was not found in ~/.aws/config"
+        else
+          AWS_VAULT_PROMPT=ykman aws-vault export cursor | awk '{print "export "$0}' >~/.aws_temp_credentials_secret
+        fi
+        if [[ -e ~/kubeconfig/cursor.config ]]; then
+          export KUBECONFIG=~/kubeconfig/cursor.config
+        else
+          echo "ERROR: kube config was not found at ~/kubeconfig/cursor.config"
+        fi
+        if [[ -e ~/.aws_temp_credentials_secret ]]; then
+          set +x
+          source ~/.aws_temp_credentials_secret
+        fi
+      fi
+      if [[ -z $CODE_EDITOR ]]; then
+        OPEN_EDITOR=code
+      else
+        OPEN_EDITOR=$CODE_EDITOR
+      fi
+      echo "Opening $OPEN_EDITOR"
+      $OPEN_EDITOR
       ;;
     *)
       cat <<EOF
 Usage:
-  $0 pr                  Push with 'git' and open PR with 'gh' from current HEAD branch
-  $0 label github_url    Tags PR/Issue with my label, milestone and add to GH Project
-  $0 clean               Deletes current branch, checkout main/master branch and pull
-  $0 clone local branch  Clones from local and creates branch
+  $0 pr                     Push with 'git' and open PR with 'gh' from current HEAD branch
+  $0 label github_url       Tags PR/Issue with my label, milestone and add to GH Project
+  $0 clean                  Deletes current branch, checkout main/master branch and pull
+  $0 worktree repo branch   Created worktree from local repo and creates branch and opens cursor
+  $0 vsk8s                  Open VSCode with k8s config
 EOF
       ;;
   esac
 }
-if [[ -e ~/.aws_temp_credentials_secret ]]; then
-  source ~/.aws_temp_credentials_secret
+if [[ -n $VSCODE_INJECTION && $VSCODE_INJECTION == "1" || -n $VSCODE_GIT_IPC_HANDLE || -n $VSCODE_NONCE ]]; then
+  if set | grep -v grep | grep -i ASKPASS | grep -q -E '/(Visual Studio Code.app)/'; then
+    DETECTED=code
+  fi
+  if [[ -n $CURSOR_TRACE_ID ]]; then
+    DETECTED=cursor
+  else
+    if set | grep -v grep | grep -i ASKPASS | grep -q -E '/(Cursor.app|.cursor-server)/'; then
+      DETECTED=cursor
+    fi
+  fi
+fi
+if [[ $DETECTED == "code" || $DETECTED == "cursor" ]]; then
+  # only load ~/.aws_temp_credentials_secret if vscode/cursor detected to avoid polluting terminal
+  if [[ -e ~/kubeconfig/cursor.config ]]; then
+    export KUBECONFIG=~/kubeconfig/cursor.config
+  fi
+  if [[ -e ~/.aws_temp_credentials_secret ]]; then
+    set +x
+    source ~/.aws_temp_credentials_secret
+  fi
 fi
 
 ########################################
@@ -569,7 +589,7 @@ repos-updatemaster() {
 audio() {
   FUZZY_MATCH="$1"
   LIST_CMD=(SwitchAudioSource -a)
-  GREP_CMD=(grep -v -i -E 'microphone|samsung')
+  GREP_CMD=(grep -v -i -E 'microphone|samsung|ultrafine|u32j59x')
   if type SwitchAudioSource &>/dev/null; then
     # shellcheck disable=SC2128
     FOUND_AUDIO_DEVICE=$($LIST_CMD | $GREP_CMD | grep -i "$FUZZY_MATCH" | head -n 1)
@@ -580,6 +600,16 @@ audio() {
       $LIST_CMD | $GREP_CMD
     fi
   fi
+}
+vol() {
+  for i in $(find "$HOME/.osascripts" -type f -name 'volume-[0-9][0-9].scpt' | sort); do
+    VOLUME_PERCENT=$(echo "$i" | grep -o -E '[0-9]+')
+    echo -n "❓ Set volume to $VOLUME_PERCENT ...?"
+    read
+    osascript "$i"
+    echo -n "$VOLUME_PERCENT ✅"
+    echo
+  done
 }
 
 ########################################
