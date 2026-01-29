@@ -37,7 +37,7 @@ fi
 # if allowed, don't touch SSH_AUTH_SOCK because vscode will set it up to forward to host ssh-agent
 
 # dynamically add gpg-sign if allowed (Terminal) or not cursor
-if [[ -e "$HOME/.allowed_git_sign" ]] || [[ "cursor" != $DETECTED ]]; then
+if [[ -e "$HOME/.allowed_git_sign" ]] || [[ $DETECTED != "cursor" ]]; then
   if echo "$@" | sed -e 's,committer,,ig' -e 's,reverts,,ig' | grep -q -E " (amend|cherry-pick|commit|merge|rebase|revert|$(/usr/bin/git config --get-regexp '^alias\.' | grep -E 'amend|cherry-pick|commit|rebase|merge|revert' | sed -e 's/^alias\.//g' -e 's/ .*//g' | tr '\n' '|' | sed 's,|$,,'))"; then
     export GPG_SIGN="--gpg-sign"
   fi
