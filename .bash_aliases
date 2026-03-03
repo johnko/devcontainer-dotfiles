@@ -274,10 +274,7 @@ gg() {
       ;;
     clean)
       OLD_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-      DEFAULT_BRANCH=master
-      if git branch -a | grep -q 'remotes/origin/main'; then
-        DEFAULT_BRANCH=main
-      fi
+      DEFAULT_BRANCH=$(git rev-parse --abbrev-ref origin/HEAD | sed 's,origin/,,')
       set -x
       git checkout "$DEFAULT_BRANCH"
       if [[ $OLD_BRANCH != "$DEFAULT_BRANCH" ]]; then
@@ -304,16 +301,30 @@ gg() {
       fi
       if [[ -e $LOCAL_REPO && -e "$LOCAL_REPO/.git" ]]; then
         SAFE_BRANCH=$(echo "$3" | sed 's/[^a-zA-Z0-9-]/-/g' | cut -c1-50)
-
         pushd "$LOCAL_REPO"
-        DEFAULT_BRANCH=master
-        if git branch -a | grep -q 'remotes/origin/main'; then
-          DEFAULT_BRANCH=main
+        FOLDER_NAME=$(basename "$(pwd)")
+        if [[ -z $DESTINATION_FOLDER ]]; then
+          DESTINATION_FOLDER=../"$FOLDER_NAME.worktrees/$SAFE_BRANCH"
         fi
+
+        DEFAULT_BRANCH=$(git rev-parse --abbrev-ref origin/HEAD | sed 's,origin/,,')
         git fetch origin "$DEFAULT_BRANCH"
-        git worktree add -b "$SAFE_BRANCH" ../"$LOCAL_REPO.worktrees/$SAFE_BRANCH" "origin/$DEFAULT_BRANCH"
+
+        for _ in 1 2; do
+          if [[ ! -e $DESTINATION_FOLDER ]]; then
+            # add new branch or checkout existing
+            # --no-track so it doesn't try to push to main by default
+            git worktree add --no-track -b "$SAFE_BRANCH" "$DESTINATION_FOLDER" "origin/$DEFAULT_BRANCH" ||
+              git worktree add "$DESTINATION_FOLDER" "$SAFE_BRANCH" || true
+            if [[ ! -e $DESTINATION_FOLDER ]]; then
+              # still no folder?
+              git worktree prune
+            fi
+          fi
+        done
 
         pushd ../"$LOCAL_REPO.worktrees/$SAFE_BRANCH"
+        git branch -u "origin/$SAFE_BRANCH"
         echo "Opening code and cursor (if possible)"
         if type code &>/dev/null; then
           code .
@@ -354,7 +365,7 @@ Usage:
   $0 pr                     Push with 'git' and open PR with 'gh' from current HEAD branch
   $0 label github_url       Tags PR/Issue with my label, milestone and add to GH Project
   $0 clean                  Deletes current branch, checkout main/master branch and pull
-  $0 worktree repo branch   Created worktree from local repo and creates branch and opens cursor
+  $0 worktree repo branch   Creates worktree from local repo and creates branch and opens cursor
   $0 vsk8s                  Open VSCode with k8s config
 EOF
       ;;
